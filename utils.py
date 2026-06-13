@@ -1,9 +1,10 @@
 """
 utils.py
 --------
-Fonctions utilitaires pour le projet BERT BBC News Classification.
+Fonctions utilitaires pour le projet BERT True News Classification.
 """
 
+import re
 import random
 import numpy as np
 import pandas as pd
@@ -12,7 +13,7 @@ import pandas as pd
 def set_seed(seed: int = 42):
     """
     Fixe toutes les seeds pour garantir la reproductibilité des résultats.
-    
+
     Args:
         seed: valeur de la seed (défaut 42)
     """
@@ -27,38 +28,115 @@ def set_seed(seed: int = 42):
         pass
     print(f"[INFO] Seed fixée à {seed}")
 
-def load_dataset(path: str):
+
+def clean_text(text: str) -> str:
     """
-    Charge le dataset BBC News et le prépare pour la classification.
-    
-    - Concatène title + [SEP] + content en une colonne 'text'
-    - Encode les catégories en entiers dans une colonne 'label'
+    Nettoie les caractères mal encodés dans le texte.
 
     Args:
-        path: chemin vers bbc-news-data.csv
+        text: texte brut à nettoyer
+
+    Returns:
+        texte nettoyé
+    """
+    text = text.encode('utf-8', errors='ignore').decode('utf-8')
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
+
+
+def load_dataset(path: str):
+    """
+    Charge le dataset True News et le prépare pour la classification.
+
+    - Concatène title + [SEP] + text en une colonne 'input_text'
+    - Encode les sujets en entiers dans une colonne 'label'
+
+    Args:
+        path: chemin vers True.csv
 
     Returns:
         df       : DataFrame enrichi
-        label2id : dict catégorie → entier  (ex: {'business': 0, ...})
-        id2label : dict entier → catégorie  (ex: {0: 'business', ...})
+        label2id : dict sujet → entier  (ex: {'politicsNews': 0, ...})
+        id2label : dict entier → sujet  (ex: {0: 'politicsNews', ...})
     """
-    df = pd.read_csv(path, sep='\t')
+    df = pd.read_csv(path)
 
-    # Concaténation : title + [SEP] + content
-    df['text'] = df['title'] + " [SEP] " + df['content']
+    # Nettoyage des textes
+    df['text'] = df['text'].astype(str).apply(clean_text)
+    df['title'] = df['title'].astype(str).apply(clean_text)
 
-    # Encodage des labels : tri alphabétique pour la reproductibilité
-    categories = sorted(df['category'].unique())
+    # Concaténation title + [SEP] + text
+    df['input_text'] = df['title'] + " [SEP] " + df['text']
+
+    # Encodage des labels
+    categories = sorted(df['subject'].unique())
     label2id = {cat: idx for idx, cat in enumerate(categories)}
     id2label = {idx: cat for cat, idx in label2id.items()}
-    df['label'] = df['category'].map(label2id)
+    df['label'] = df['subject'].map(label2id)
 
     print(f"[INFO] Dataset chargé : {len(df)} exemples, {len(categories)} classes")
     print(f"[INFO] Mapping labels : {label2id}")
 
     return df, label2id, id2label
 
+
+def explore_dataset(df: pd.DataFrame):
+    """
+    Affiche les statistiques descriptives du dataset.
+
+    - Nombre total d'exemples et de classes
+    - Distribution des classes avec détection de déséquilibre
+    - Longueur des textes (min, max, moyenne, médiane)
+    - 5 exemples aléatoires avec leurs labels
+
+    Args:
+        df: DataFrame retourné par load_dataset()
+    """
+    print("\n" + "="*60)
+    print("        EXPLORATION DU DATASET TRUE NEWS")
+    print("="*60)
+
+    # Nombre d'exemples et classes
+    print(f"\n📊 Nombre total d'exemples : {len(df)}")
+    print(f"📊 Nombre de classes       : {df['subject'].nunique()}")
+
+    # Distribution des classes
+    print("\n📊 Distribution des classes :")
+    dist = df['subject'].value_counts()
+    for cat, count in dist.items():
+        pct = count / len(df) * 100
+        barre = "█" * int(pct / 2)
+        print(f"   {cat:<15} : {count} exemples ({pct:.1f}%) {barre}")
+
+    # Vérification déséquilibre
+    ratio = dist.max() / dist.min()
+    print(f"\n   → Ratio max/min : {ratio:.2f}:1 ", end="")
+    if ratio < 2:
+        print("✅ Équilibré — aucune stratégie spéciale nécessaire")
+    else:
+        print("⚠️  Déséquilibré — stratégie à justifier")
+
+    # Longueur des textes
+    df['text_len'] = df['input_text'].astype(str).apply(lambda x: len(x.split()))
+    print(f"\n📊 Longueur des textes (en mots) :")
+    print(f"   Min     : {df['text_len'].min()}")
+    print(f"   Max     : {df['text_len'].max()}")
+    print(f"   Moyenne : {df['text_len'].mean():.0f}")
+    print(f"   Médiane : {df['text_len'].median():.0f}")
+    print(f"\n   → Choix max_length BERT : 512 tokens")
+    print(f"     (médiane ~400 mots ≈ 500 tokens après tokenization)")
+
+    # 5 exemples
+    print("\n📊 5 exemples du dataset :")
+    print("-"*60)
+    for _, row in df.sample(5, random_state=42).iterrows():
+        print(f"  Sujet   : {row['subject']}")
+        print(f"  Titre   : {row['title']}")
+        print(f"  Contenu : {row['text'][:100]}...")
+        print("-"*60)
+
+
 if __name__ == "__main__":
     set_seed(42)
-    df, label2id, id2label = load_dataset("data/bbc-news-data.csv")
-    print(df[['category', 'label', 'text']].head(3))
+    df, label2id, id2label = load_dataset("data/True.csv")
+    explore_dataset(df)
