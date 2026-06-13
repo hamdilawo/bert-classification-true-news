@@ -10,6 +10,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.metrics import classification_report, confusion_matrix
+
 
 
 def set_seed(seed: int = 42):
@@ -196,6 +198,42 @@ def plot_training_curves(history: dict, save_path: str = None):
         print(f"[INFO] Courbes sauvegardées : {save_path}")
     plt.show()
 
+def plot_confusion_matrix(y_true, y_pred, labels: list, save_path: str = None):
+    """
+    Affiche la matrice de confusion.
+
+    Args:
+        y_true   : labels réels
+        y_pred   : labels prédits
+        labels   : liste des noms de classes
+        save_path: chemin de sauvegarde (optionnel)
+    """
+    cm = confusion_matrix(y_true, y_pred)
+    fig, ax = plt.subplots(figsize=(6, 5))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                xticklabels=labels, yticklabels=labels, ax=ax)
+    ax.set_title('Matrice de confusion')
+    ax.set_ylabel('Réel')
+    ax.set_xlabel('Prédit')
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path, dpi=150)
+        print(f"[INFO] Matrice sauvegardée : {save_path}")
+    plt.show()
+
+
+def print_classification_report(y_true, y_pred, labels: list):
+    """
+    Affiche le rapport de classification complet.
+
+    Args:
+        y_true : labels réels
+        y_pred : labels prédits
+        labels : liste des noms de classes
+    """
+    print("\n📊 Rapport de classification :")
+    print(classification_report(y_true, y_pred, target_names=labels))
+
 if __name__ == "__main__":
     set_seed(42)
     df, label2id, id2label = load_dataset("data/True.csv")
@@ -210,3 +248,18 @@ if __name__ == "__main__":
         'val_accuracy':   [0.78, 0.85, 0.90]
     }
     plot_training_curves(history, save_path="results/training_curves.png")
+# Test avec données fictives
+    history = {
+        'train_loss':     [0.45, 0.30, 0.20],
+        'val_loss':       [0.50, 0.35, 0.25],
+        'train_accuracy': [0.80, 0.88, 0.93],
+        'val_accuracy':   [0.78, 0.85, 0.90]
+    }
+    plot_training_curves(history, save_path="results/training_curves.png")
+
+    # Test matrice de confusion avec données fictives
+    y_true = [0, 0, 1, 1, 0, 1, 0, 1]
+    y_pred = [0, 1, 1, 1, 0, 0, 0, 1]
+    labels = list(label2id.keys())
+    plot_confusion_matrix(y_true, y_pred, labels, save_path="results/confusion_matrix.png")
+    print_classification_report(y_true, y_pred, labels)
