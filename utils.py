@@ -147,7 +147,7 @@ def plot_class_distribution(df: pd.DataFrame, save_path: str = None):
     """
     fig, ax = plt.subplots(figsize=(8, 5))
     dist = df['subject'].value_counts()
-    sns.barplot(x=dist.index, y=dist.values, palette='viridis', ax=ax)
+    sns.barplot(x=dist.index, y=dist.values, hue=dist.index, palette='viridis', legend=False, ax=ax)
     ax.set_title("Distribution des classes — True News Dataset")
     ax.set_xlabel("Catégorie")
     ax.set_ylabel("Nombre d'articles")
@@ -159,8 +159,54 @@ def plot_class_distribution(df: pd.DataFrame, save_path: str = None):
         print(f"[INFO] Graphique sauvegardé : {save_path}")
     plt.show()
 
+def plot_training_curves(history: dict, save_path: str = None):
+    """
+    Trace les courbes loss et accuracy train/val par epoch.
+
+    Args:
+        history  : dict avec clés train_loss, val_loss,
+                   train_accuracy, val_accuracy
+        save_path: chemin de sauvegarde (optionnel)
+    """
+    epochs = range(1, len(history['train_loss']) + 1)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+    # Courbe Loss
+    ax1.plot(epochs, history['train_loss'], 'b-o', label='Train Loss')
+    ax1.plot(epochs, history['val_loss'], 'r-o', label='Val Loss')
+    ax1.set_title('Loss par epoch')
+    ax1.set_xlabel('Epoch')
+    ax1.set_ylabel('Loss')
+    ax1.legend()
+    ax1.grid(True)
+
+    # Courbe Accuracy
+    ax2.plot(epochs, history['train_accuracy'], 'b-o', label='Train Accuracy')
+    ax2.plot(epochs, history['val_accuracy'], 'r-o', label='Val Accuracy')
+    ax2.set_title('Accuracy par epoch')
+    ax2.set_xlabel('Epoch')
+    ax2.set_ylabel('Accuracy')
+    ax2.legend()
+    ax2.grid(True)
+
+    plt.suptitle("Courbes d'apprentissage — BERT True News", fontsize=13)
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path, dpi=150)
+        print(f"[INFO] Courbes sauvegardées : {save_path}")
+    plt.show()
+
 if __name__ == "__main__":
     set_seed(42)
     df, label2id, id2label = load_dataset("data/True.csv")
     explore_dataset(df)
-    plot_class_distribution(df, save_path="results/class_distribution.png") 
+    plot_class_distribution(df, save_path="results/class_distribution.png")
+
+    # Test plot_training_curves avec données fictives
+    history = {
+        'train_loss':     [0.45, 0.30, 0.20],
+        'val_loss':       [0.50, 0.35, 0.25],
+        'train_accuracy': [0.80, 0.88, 0.93],
+        'val_accuracy':   [0.78, 0.85, 0.90]
+    }
+    plot_training_curves(history, save_path="results/training_curves.png")
