@@ -8,6 +8,8 @@ import re
 import random
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 
 def set_seed(seed: int = 42):
@@ -97,28 +99,28 @@ def explore_dataset(df: pd.DataFrame):
     print("="*60)
 
     # Nombre d'exemples et classes
-    print(f"\n📊 Nombre total d'exemples : {len(df)}")
-    print(f"📊 Nombre de classes       : {df['subject'].nunique()}")
+    print(f"\n Nombre total d'exemples : {len(df)}")
+    print(f" Nombre de classes       : {df['subject'].nunique()}")
 
     # Distribution des classes
-    print("\n📊 Distribution des classes :")
+    print("\n Distribution des classes :")
     dist = df['subject'].value_counts()
     for cat, count in dist.items():
         pct = count / len(df) * 100
-        barre = "█" * int(pct / 2)
+        barre = "" * int(pct / 2)
         print(f"   {cat:<15} : {count} exemples ({pct:.1f}%) {barre}")
 
     # Vérification déséquilibre
     ratio = dist.max() / dist.min()
     print(f"\n   → Ratio max/min : {ratio:.2f}:1 ", end="")
     if ratio < 2:
-        print("✅ Équilibré — aucune stratégie spéciale nécessaire")
+        print("Équilibré — aucune stratégie spéciale nécessaire")
     else:
-        print("⚠️  Déséquilibré — stratégie à justifier")
+        print("Déséquilibré — stratégie à justifier")
 
     # Longueur des textes
     df['text_len'] = df['input_text'].astype(str).apply(lambda x: len(x.split()))
-    print(f"\n📊 Longueur des textes (en mots) :")
+    print(f"\n Longueur des textes (en mots) :")
     print(f"   Min     : {df['text_len'].min()}")
     print(f"   Max     : {df['text_len'].max()}")
     print(f"   Moyenne : {df['text_len'].mean():.0f}")
@@ -127,7 +129,7 @@ def explore_dataset(df: pd.DataFrame):
     print(f"     (médiane ~400 mots ≈ 500 tokens après tokenization)")
 
     # 5 exemples
-    print("\n📊 5 exemples du dataset :")
+    print("\n 5 exemples du dataset :")
     print("-"*60)
     for _, row in df.sample(5, random_state=42).iterrows():
         print(f"  Sujet   : {row['subject']}")
@@ -135,8 +137,30 @@ def explore_dataset(df: pd.DataFrame):
         print(f"  Contenu : {row['text'][:100]}...")
         print("-"*60)
 
+def plot_class_distribution(df: pd.DataFrame, save_path: str = None):
+    """
+    Affiche la distribution des classes sous forme de barplot.
+
+    Args:
+        df       : DataFrame retourné par load_dataset()
+        save_path: chemin de sauvegarde du graphique (optionnel)
+    """
+    fig, ax = plt.subplots(figsize=(8, 5))
+    dist = df['subject'].value_counts()
+    sns.barplot(x=dist.index, y=dist.values, palette='viridis', ax=ax)
+    ax.set_title("Distribution des classes — True News Dataset")
+    ax.set_xlabel("Catégorie")
+    ax.set_ylabel("Nombre d'articles")
+    for i, v in enumerate(dist.values):
+        ax.text(i, v + 50, str(v), ha='center', fontweight='bold')
+    plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path, dpi=150)
+        print(f"[INFO] Graphique sauvegardé : {save_path}")
+    plt.show()
 
 if __name__ == "__main__":
     set_seed(42)
     df, label2id, id2label = load_dataset("data/True.csv")
     explore_dataset(df)
+    plot_class_distribution(df, save_path="results/class_distribution.png") 
