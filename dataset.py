@@ -31,6 +31,7 @@ class TextClassificationDataset(Dataset):
         self.tokenizer = tokenizer
         self.max_length = max_length
 
+
     def __len__(self):
         """Retourne le nombre total d'exemples dans le dataset."""
         return len(self.texts)
@@ -45,4 +46,48 @@ class TextClassificationDataset(Dataset):
         Returns:
             dict avec input_ids, attention_mask et label
         """
-        pass  # sera implémenté au prochain commit
+        text = str(self.texts[idx])
+        label = int(self.labels[idx])
+
+        # Tokenization avec padding et troncature
+        encoding = self.tokenizer(
+            text,
+            max_length=self.max_length,
+            padding='max_length',
+            truncation=True,
+            return_tensors='pt'
+        )
+
+        return {
+            'input_ids':      encoding['input_ids'].squeeze(0),
+            'attention_mask': encoding['attention_mask'].squeeze(0),
+            'label':          torch.tensor(label, dtype=torch.long)
+        }
+    
+if __name__ == "__main__":
+    from transformers import BertTokenizer
+    from utils import load_dataset, set_seed
+
+    set_seed(42)
+
+    # Chargement du dataset
+    df, label2id, id2label = load_dataset("data/True.csv")
+
+    # Initialisation du tokenizer
+    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+
+    # Création du dataset
+    dataset = TextClassificationDataset(
+        texts=df['input_text'].tolist(),
+        labels=df['label'].tolist(),
+        tokenizer=tokenizer,
+        max_length=512
+    )
+
+    # Vérification
+    print(f"[INFO] Taille du dataset : {len(dataset)}")
+    sample = dataset[0]
+    print(f"[INFO] input_ids shape      : {sample['input_ids'].shape}")
+    print(f"[INFO] attention_mask shape : {sample['attention_mask'].shape}")
+    print(f"[INFO] label                : {sample['label']}")  
+
