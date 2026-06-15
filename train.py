@@ -81,3 +81,62 @@ def train_epoch(model, dataloader, optimizer, scheduler, device, accum_steps=4):
     accuracy = correct / total
 
     return avg_loss, accuracy
+# ──────────────────────────────────────────────
+# 2. Boucle d'évaluation
+# ──────────────────────────────────────────────
+
+def eval_epoch(model, dataloader, device):
+    """
+    Effectue une epoch complète d'évaluation.
+
+    L'analogie : c'est le match officiel — le Dropout est désactivé,
+    tous les neurones participent, on observe sans corriger.
+
+    Args:
+        model      : BertClassifier
+        dataloader : DataLoader de validation
+        device     : cpu ou cuda
+
+    Returns:
+        avg_loss  : loss moyenne
+        accuracy  : accuracy
+        f1        : F1-score macro
+        all_preds : liste des prédictions
+        all_labels: liste des labels réels
+    """
+    # Mode évaluation — Dropout désactivé
+    model.eval()
+
+    total_loss = 0
+    correct    = 0
+    total      = 0
+    all_preds  = []
+    all_labels = []
+    criterion  = nn.CrossEntropyLoss()
+
+    # Pas de calcul de gradients — on observe seulement
+    with torch.no_grad():
+        for batch in tqdm(dataloader, desc="  Eval "):
+            input_ids      = batch['input_ids'].to(device)
+            attention_mask = batch['attention_mask'].to(device)
+            labels         = batch['label'].to(device)
+
+            # Forward pass uniquement
+            logits = model(input_ids, attention_mask)
+            loss   = criterion(logits, labels)
+
+            # Statistiques
+            total_loss += loss.item()
+            preds       = torch.argmax(logits, dim=1)
+            correct    += (preds == labels).sum().item()
+            total      += labels.size(0)
+
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+
+    avg_loss = total_loss / len(dataloader)
+    accuracy = correct / total
+    f1       = f1_score(all_labels, all_preds, average='macro')
+
+    return avg_loss, accuracy, f1, all_preds, all_labels
+
