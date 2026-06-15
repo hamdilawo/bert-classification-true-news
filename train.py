@@ -279,4 +279,50 @@ def main():
     print(f"\n🎉 Entraînement terminé ! Meilleur val_loss : {best_val_loss:.4f}")
 
     return history, id2label, MODEL_PATH
+# ──────────────────────────────────────────────
+# 4. Point d'entrée
+# ──────────────────────────────────────────────
 
+if __name__ == "__main__":
+    from utils import plot_training_curves, plot_confusion_matrix, print_classification_report
+    from model import BertClassifier
+    from dataset import TextClassificationDataset
+    from utils import load_dataset, set_seed
+    from sklearn.model_selection import train_test_split
+    from transformers import BertTokenizer
+    import torch
+
+    history, id2label, MODEL_PATH = main()
+
+    # Visualisation des courbes
+    plot_training_curves(history, save_path="results/training_curves.png")
+
+    # Évaluation finale avec le meilleur modèle
+    print("\n[INFO] Évaluation finale avec le meilleur modèle...")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    df, label2id, id2label = load_dataset("data/True.csv")
+    _, val_df = train_test_split(df, test_size=0.2, random_state=42, stratify=df['label'])
+    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+
+    from dataset import TextClassificationDataset
+    val_dataset = TextClassificationDataset(
+        texts=val_df['input_text'].tolist(),
+        labels=val_df['label'].tolist(),
+        tokenizer=tokenizer,
+        max_length=128
+    )
+    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=16, shuffle=False)
+
+    best_model = BertClassifier(num_classes=2, dropout=0.3).to(device)
+    best_model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
+
+    _, final_acc, final_f1, final_preds, final_labels = eval_epoch(best_model, val_loader, device)
+
+    print(f"\n🏆 Accuracy finale : {final_acc:.4f}")
+    print(f"🏆 F1-score macro  : {final_f1:.4f}")
+
+    labels_list = list(id2label.values())
+    plot_confusion_matrix(final_labels, final_preds, labels=labels_list,
+                          save_path="results/confusion_matrix.png")
+    print_classification_report(final_labels, final_preds, labels=labels_list)
