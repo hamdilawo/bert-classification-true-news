@@ -139,4 +139,144 @@ def eval_epoch(model, dataloader, device):
     f1       = f1_score(all_labels, all_preds, average='macro')
 
     return avg_loss, accuracy, f1, all_preds, all_labels
+# ──────────────────────────────────────────────
+# 3. Fonction principale
+# ──────────────────────────────────────────────
+
+def main():
+    """
+    Orchestre tout le pipeline :
+    chargement → split → tokenization → entraînement → sauvegarde.
+    """
+    from utils   import set_seed, load_dataset
+    from dataset import TextClassificationDataset
+    from model   import BertClassifier
+
+    # ── Hyperparamètres ──────────────────────────────────────────
+    SEED         = 42
+    MAX_LENGTH   = 128    # justifié : médiane ~370 mots, compromis vitesse/perf
+    BATCH_SIZE   = 16     # selon VRAM Colab T4 (15GB)
+    ACCUM_STEPS  = 4      # batch effectif = 64
+    EPOCHS       = 3      # BERT converge vite, risque overfitting au-delà
+    LR           = 2e-5   # typique fine-tuning BERT
+    WEIGHT_DECAY = 0.01
+    WARMUP_RATIO = 0.1
+    NUM_CLASSES  = 2
+    DATA_PATH    = "data/True.csv"
+    MODEL_PATH   = "results/best_model.pt"
+
+    os.makedirs("results", exist_ok=True)
+    set_seed(SEED)
+
+    # ── Device ───────────────────────────────────────────────────
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"\n[INFO] Device : {device}")
+    if torch.cuda.is_available():
+        print(f"[INFO] GPU    : {torch.cuda.get_device_name(0)}")
+
+    # ── Chargement du dataset ────────────────────────────────────
+    print("\n[INFO] Chargement du dataset...")
+    df, label2id, id2label = load_dataset(DATA_PATH)
+
+    # ── Split train/val 80/20 stratifié ─────────────────────────
+    train_df, val_df = train_test_split(
+        df,
+        test_size=0.2,
+        random_state=SEED,
+        stratify=df['label']
+    )
+    print(f"[INFO] Train : {len(train_df)} | Val : {len(val_df)}")
+
+    # ── Tokenizer ────────────────────────────────────────────────
+    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+
+    # ── Datasets PyTorch ─────────────────────────────────────────
+    train_dataset = TextClassificationDataset(
+        texts=train_df['input_text'].tolist(),
+        labels=train_df['label'].tolist(),
+        tokenizer=tokenizer,
+        max_length=MAX_LENGTH
+    )
+    val_dataset = TextClassificationDataset(
+        texts=val_df['input_text'].tolist(),
+        labels=val_df['label'].tolist(),
+        tokenizer=tokenizer,
+        max_length=MAX_LENGTH
+    )
+
+    # ── DataLoaders ───────────────────────────────────────────────
+    train_loader = DataLoader(
+        train_dataset, batch_size=BATCH_SIZE,
+        shuffle=True, num_workers=2, pin_memory=True
+    )
+    val_loader = DataLoader(
+        val_dataset, batch_size=BATCH_SIZE,
+        shuffle=False, num_workers=2, pin_memory=True
+    )
+    print(f"[INFO] Batches train : {len(train_loader)} | val : {len(val_loader)}")
+
+    # ── Modèle ───────────────────────────────────────────────────
+    model = BertClassifier(num_classes=NUM_CLASSES, dropout=0.3).to(device)
+    print(f"[INFO] Modèle chargé sur {device}")
+
+    # ── Optimiseur AdamW ─────────────────────────────────────────
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr=LR,
+        weight_decay=WEIGHT_DECAY
+    )
+
+    # ── Scheduler linéaire avec warmup ───────────────────────────
+    total_steps  = (len(train_loader) // ACCUM_STEPS) * EPOCHS
+    warmup_steps = int(total_steps * WARMUP_RATIO)
+    scheduler = get_linear_schedule_with_warmup(
+        optimizer,
+        num_warmup_steps=warmup_steps,
+        num_training_steps=total_steps
+    )
+    print(f"[INFO] Steps totaux : {total_steps} | Warmup : {warmup_steps}")
+
+    # ── Boucle d'entraînement ────────────────────────────────────
+    best_val_loss = float('inf')
+    history = {
+        'train_loss': [], 'val_loss': [],
+        'train_accuracy': [], 'val_accuracy': [],
+        'val_f1': []
+    }
+
+    print("\n[INFO] Début de l'entraînement...\n")
+
+    for epoch in range(1, EPOCHS + 1):
+        print(f"\n{'='*50}")
+        print(f"  EPOCH {epoch}/{EPOCHS}")
+        print(f"{'='*50}")
+
+        train_loss, train_acc = train_epoch(
+            model, train_loader, optimizer, scheduler, device, ACCUM_STEPS
+        )
+        val_loss, val_acc, val_f1, _, _ = eval_epoch(
+            model, val_loader, device
+        )
+
+        # Sauvegarde historique
+        history['train_loss'].append(train_loss)
+        history['val_loss'].append(val_loss)
+        history['train_accuracy'].append(train_acc)
+        history['val_accuracy'].append(val_acc)
+        history['val_f1'].append(val_f1)
+
+        print(f"\n📊 Train Loss : {train_loss:.4f} | Train Acc : {train_acc:.4f}")
+        print(f"📊 Val   Loss : {val_loss:.4f} | Val   Acc : {val_acc:.4f}")
+        print(f"📊 Val   F1   : {val_f1:.4f}")
+        print(f"📊 LR         : {scheduler.get_last_lr()[0]:.2e}")
+
+        # Sauvegarde du meilleur modèle
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            torch.save(model.state_dict(), MODEL_PATH)
+            print(f"✅ Meilleur modèle sauvegardé (val_loss={best_val_loss:.4f})")
+
+    print(f"\n🎉 Entraînement terminé ! Meilleur val_loss : {best_val_loss:.4f}")
+
+    return history, id2label, MODEL_PATH
 
