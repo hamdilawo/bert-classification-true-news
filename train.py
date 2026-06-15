@@ -1,3 +1,13 @@
+"""
+train.py
+--------
+Boucles d'entraînement et d'évaluation du modèle BERT.
+Contient : train_epoch(), eval_epoch(), main()
+
+Usage sur Google Colab :
+    !python train.py
+"""
+
 import os
 import torch
 import torch.nn as nn
@@ -58,7 +68,6 @@ def train_epoch(model, dataloader, optimizer, scheduler, device, accum_steps=4):
 
         # Mise à jour des poids tous les accum_steps batches
         if (i + 1) % accum_steps == 0:
-            # Gradient clipping — évite l'explosion des gradients
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             optimizer.step()
             scheduler.step()
@@ -81,6 +90,8 @@ def train_epoch(model, dataloader, optimizer, scheduler, device, accum_steps=4):
     accuracy = correct / total
 
     return avg_loss, accuracy
+
+
 # ──────────────────────────────────────────────
 # 2. Boucle d'évaluation
 # ──────────────────────────────────────────────
@@ -104,7 +115,6 @@ def eval_epoch(model, dataloader, device):
         all_preds : liste des prédictions
         all_labels: liste des labels réels
     """
-    # Mode évaluation — Dropout désactivé
     model.eval()
 
     total_loss = 0
@@ -114,18 +124,15 @@ def eval_epoch(model, dataloader, device):
     all_labels = []
     criterion  = nn.CrossEntropyLoss()
 
-    # Pas de calcul de gradients — on observe seulement
     with torch.no_grad():
         for batch in tqdm(dataloader, desc="  Eval "):
             input_ids      = batch['input_ids'].to(device)
             attention_mask = batch['attention_mask'].to(device)
             labels         = batch['label'].to(device)
 
-            # Forward pass uniquement
             logits = model(input_ids, attention_mask)
             loss   = criterion(logits, labels)
 
-            # Statistiques
             total_loss += loss.item()
             preds       = torch.argmax(logits, dim=1)
             correct    += (preds == labels).sum().item()
@@ -139,6 +146,8 @@ def eval_epoch(model, dataloader, device):
     f1       = f1_score(all_labels, all_preds, average='macro')
 
     return avg_loss, accuracy, f1, all_preds, all_labels
+
+
 # ──────────────────────────────────────────────
 # 3. Fonction principale
 # ──────────────────────────────────────────────
@@ -154,11 +163,11 @@ def main():
 
     # ── Hyperparamètres ──────────────────────────────────────────
     SEED         = 42
-    MAX_LENGTH   = 128    # justifié : médiane ~370 mots, compromis vitesse/perf
-    BATCH_SIZE   = 16     # selon VRAM Colab T4 (15GB)
-    ACCUM_STEPS  = 4      # batch effectif = 64
-    EPOCHS       = 3      # BERT converge vite, risque overfitting au-delà
-    LR           = 2e-5   # typique fine-tuning BERT
+    MAX_LENGTH   = 128
+    BATCH_SIZE   = 16
+    ACCUM_STEPS  = 4        # batch effectif = 64
+    EPOCHS       = 3
+    LR           = 2e-5
     WEIGHT_DECAY = 0.01
     WARMUP_RATIO = 0.1
     NUM_CLASSES  = 2
@@ -173,6 +182,7 @@ def main():
     print(f"\n[INFO] Device : {device}")
     if torch.cuda.is_available():
         print(f"[INFO] GPU    : {torch.cuda.get_device_name(0)}")
+        print(f"[INFO] VRAM   : {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
 
     # ── Chargement du dataset ────────────────────────────────────
     print("\n[INFO] Chargement du dataset...")
@@ -205,13 +215,14 @@ def main():
     )
 
     # ── DataLoaders ───────────────────────────────────────────────
+    # num_workers=0 : compatible Windows ET Colab
     train_loader = DataLoader(
         train_dataset, batch_size=BATCH_SIZE,
-        shuffle=True, num_workers=2, pin_memory=True
+        shuffle=True, num_workers=0, pin_memory=torch.cuda.is_available()
     )
     val_loader = DataLoader(
         val_dataset, batch_size=BATCH_SIZE,
-        shuffle=False, num_workers=2, pin_memory=True
+        shuffle=False, num_workers=0, pin_memory=torch.cuda.is_available()
     )
     print(f"[INFO] Batches train : {len(train_loader)} | val : {len(val_loader)}")
 
@@ -258,7 +269,6 @@ def main():
             model, val_loader, device
         )
 
-        # Sauvegarde historique
         history['train_loss'].append(train_loss)
         history['val_loss'].append(val_loss)
         history['train_accuracy'].append(train_acc)
@@ -270,15 +280,15 @@ def main():
         print(f"📊 Val   F1   : {val_f1:.4f}")
         print(f"📊 LR         : {scheduler.get_last_lr()[0]:.2e}")
 
-        # Sauvegarde du meilleur modèle
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             torch.save(model.state_dict(), MODEL_PATH)
             print(f"✅ Meilleur modèle sauvegardé (val_loss={best_val_loss:.4f})")
 
     print(f"\n🎉 Entraînement terminé ! Meilleur val_loss : {best_val_loss:.4f}")
-
     return history, id2label, MODEL_PATH
+
+
 # ──────────────────────────────────────────────
 # 4. Point d'entrée
 # ──────────────────────────────────────────────
@@ -290,39 +300,51 @@ if __name__ == "__main__":
     from utils import load_dataset, set_seed
     from sklearn.model_selection import train_test_split
     from transformers import BertTokenizer
-    import torch
 
     history, id2label, MODEL_PATH = main()
 
     # Visualisation des courbes
     plot_training_curves(history, save_path="results/training_curves.png")
 
-    # Évaluation finale avec le meilleur modèle
+    # Évaluation finale
     print("\n[INFO] Évaluation finale avec le meilleur modèle...")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     df, label2id, id2label = load_dataset("data/True.csv")
-    _, val_df = train_test_split(df, test_size=0.2, random_state=42, stratify=df['label'])
+    _, val_df = train_test_split(
+        df, test_size=0.2, random_state=42, stratify=df['label']
+    )
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-
-    from dataset import TextClassificationDataset
     val_dataset = TextClassificationDataset(
         texts=val_df['input_text'].tolist(),
         labels=val_df['label'].tolist(),
         tokenizer=tokenizer,
         max_length=128
     )
-    val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=16, shuffle=False)
+    val_loader = DataLoader(val_dataset, batch_size=16, shuffle=False, num_workers=0)
 
     best_model = BertClassifier(num_classes=2, dropout=0.3).to(device)
     best_model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
 
-    _, final_acc, final_f1, final_preds, final_labels = eval_epoch(best_model, val_loader, device)
+    _, final_acc, final_f1, final_preds, final_labels = eval_epoch(
+        best_model, val_loader, device
+    )
 
     print(f"\n🏆 Accuracy finale : {final_acc:.4f}")
     print(f"🏆 F1-score macro  : {final_f1:.4f}")
 
     labels_list = list(id2label.values())
-    plot_confusion_matrix(final_labels, final_preds, labels=labels_list,
-                          save_path="results/confusion_matrix.png")
+    plot_confusion_matrix(
+        final_labels, final_preds,
+        labels=labels_list,
+        save_path="results/confusion_matrix.png"
+    )
     print_classification_report(final_labels, final_preds, labels=labels_list)
+
+    # Téléchargement du modèle depuis Colab
+    try:
+        from google.colab import files
+        #files.download(MODEL_PATH)
+        print(f"\n[INFO] Modèle téléchargé : {MODEL_PATH}")
+    except ImportError:
+        print(f"\n[INFO] Modèle disponible dans : {MODEL_PATH}")
