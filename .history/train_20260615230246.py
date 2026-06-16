@@ -26,6 +26,9 @@ def train_epoch(model, dataloader, optimizer, scheduler, device, accum_steps=4):
     """
     Effectue une epoch complète d'entraînement avec gradient accumulation.
 
+    L'analogie : c'est l'entraînement de football — le joueur transpire,
+    fait des erreurs, les analyse et corrige sa posture à chaque itération.
+
     Args:
         model       : BertClassifier
         dataloader  : DataLoader d'entraînement
@@ -272,15 +275,15 @@ def main():
         history['val_accuracy'].append(val_acc)
         history['val_f1'].append(val_f1)
 
-        print(f"\n Train Loss : {train_loss:.4f} | Train Acc : {train_acc:.4f}")
-        print(f"Val   Loss : {val_loss:.4f} | Val   Acc : {val_acc:.4f}")
-        print(f"Val   F1   : {val_f1:.4f}")
-        print(f"LR         : {scheduler.get_last_lr()[0]:.2e}")
+        print(f"\n📊 Train Loss : {train_loss:.4f} | Train Acc : {train_acc:.4f}")
+        print(f"📊 Val   Loss : {val_loss:.4f} | Val   Acc : {val_acc:.4f}")
+        print(f"📊 Val   F1   : {val_f1:.4f}")
+        print(f"📊 LR         : {scheduler.get_last_lr()[0]:.2e}")
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             torch.save(model.state_dict(), MODEL_PATH)
-            print(f"Meilleur modèle sauvegardé (val_loss={best_val_loss:.4f})")
+            print(f"✅ Meilleur modèle sauvegardé (val_loss={best_val_loss:.4f})")
 
     print(f"\n🎉 Entraînement terminé ! Meilleur val_loss : {best_val_loss:.4f}")
     return history, id2label, MODEL_PATH

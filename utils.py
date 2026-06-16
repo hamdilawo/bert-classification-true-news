@@ -239,27 +239,3 @@ if __name__ == "__main__":
     df, label2id, id2label = load_dataset("data/True.csv")
     explore_dataset(df)
     plot_class_distribution(df, save_path="results/class_distribution.png")
-
-    # Test plot_training_curves avec données fictives
-    history = {
-        'train_loss':     [0.45, 0.30, 0.20],
-        'val_loss':       [0.50, 0.35, 0.25],
-        'train_accuracy': [0.80, 0.88, 0.93],
-        'val_accuracy':   [0.78, 0.85, 0.90]
-    }
-    plot_training_curves(history, save_path="results/training_curves.png")
-# Test avec données fictives
-    history = {
-        'train_loss':     [0.45, 0.30, 0.20],
-        'val_loss':       [0.50, 0.35, 0.25],
-        'train_accuracy': [0.80, 0.88, 0.93],
-        'val_accuracy':   [0.78, 0.85, 0.90]
-    }
-    plot_training_curves(history, save_path="results/training_curves.png")
-
-    # Test matrice de confusion avec données fictives
-    y_true = [0, 0, 1, 1, 0, 1, 0, 1]
-    y_pred = [0, 1, 1, 1, 0, 0, 0, 1]
-    labels = list(label2id.keys())
-    plot_confusion_matrix(y_true, y_pred, labels, save_path="results/confusion_matrix.png")
-    print_classification_report(y_true, y_pred, labels)

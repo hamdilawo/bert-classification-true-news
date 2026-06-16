@@ -68,21 +68,8 @@ class BertClassifier(nn.Module):
 if __name__ == "__main__":
     from utils import set_seed
     set_seed(42)
-
-    # Initialisation du modèle
     model = BertClassifier(num_classes=2, dropout=0.3)
     print(f"[INFO] Modèle initialisé")
     print(f"[INFO] Taille hidden BERT : {model.bert.config.hidden_size}")
     print(f"[INFO] Nombre de classes  : 2")
-
-    # Test avec un batch fictif
-    batch_size = 2
-    max_length = 512
-    input_ids      = torch.randint(0, 1000, (batch_size, max_length))
-    attention_mask = torch.ones(batch_size, max_length, dtype=torch.long)
-
-    # Forward pass
-    logits = model(input_ids, attention_mask)
-    print(f"[INFO] Input shape  : {input_ids.shape}")
-    print(f"[INFO] Output shape : {logits.shape}")
-    print(f"[INFO] Logits       : {logits}")
+    print(f"[INFO] Paramètres totaux  : {sum(p.numel() for p in model.parameters()):,}")    
