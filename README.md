@@ -210,5 +210,5 @@ bert-classification-true-news/
 | `dataset.py` | [Sabaly] |
 | `model.py` | [Gueye] |
 | `train.py` | [Gueye] |
-| `demo.py` | [Sabaly] |
+| `demo.py` | [Sabaly&Gueye] |
 | `README.md` | [Sabaly&Gueye] |
