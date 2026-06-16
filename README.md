@@ -146,10 +146,10 @@ L'interface sera accessible à : `http://localhost:7860`
 ## 🎯 Démo Gradio
 
 ### Exemple politicsNews
-![Demo Politics](image-1.png)
+![Demo Politics](results/image-1.png)
 
 ### Exemple worldnews  
-![Demo World](image-2.png)
+![Demo World](results/image.png)
 
 ## 🛠️ Étapes de réalisation et difficultés rencontrées
 
@@ -171,7 +171,7 @@ L'interface sera accessible à : `http://localhost:7860`
 Le modèle est entraîné exclusivement sur des articles Reuters de 2016-2017 couvrant deux catégories : politique américaine 
 et actualité internationale. Il ne reconnaît pas les articles sportifs, économiques ou culturels. Ces textes sont classés 
 de façon arbitraire car hors de sa distribution d'entraînement voire image ci-dessous.
-![alt text](image.png)
+![alt text](results/image-2.png)
 ## Structure du projet
 bert-classification-true-news/
 
