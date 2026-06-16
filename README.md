@@ -149,9 +149,9 @@ L'interface sera accessible à : `http://localhost:7860`
 ![Demo Politics](results/image-1.png)
 
 ### Exemple worldnews  
-![Demo World](results/image.png)
+![Demo World](results/image2.png)
 
-## 🛠️ Étapes de réalisation et difficultés rencontrées
+## Étapes de réalisation et difficultés rencontrées
 
 ### Étapes
 1. Analyse et exploration du dataset (distribution, longueur des textes)
@@ -171,7 +171,7 @@ L'interface sera accessible à : `http://localhost:7860`
 Le modèle est entraîné exclusivement sur des articles Reuters de 2016-2017 couvrant deux catégories : politique américaine 
 et actualité internationale. Il ne reconnaît pas les articles sportifs, économiques ou culturels. Ces textes sont classés 
 de façon arbitraire car hors de sa distribution d'entraînement voire image ci-dessous.
-![alt text](results/image-2.png)
+![alt text](results/image-3.png)
 ## Structure du projet
 bert-classification-true-news/
 
